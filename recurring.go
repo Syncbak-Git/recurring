@@ -4,10 +4,11 @@ import "time"
 
 // Recurring holds a channel that delivers 'ticks' of a clock at a given time of day (UTC).
 type Recurring struct {
-	C      <-chan time.Time // The channel on which the ticks are delivered
-	c      chan time.Time
-	ticker *time.Ticker
-	quit   chan interface{}
+	C                    <-chan time.Time // The channel on which the ticks are delivered.
+	c                    chan time.Time
+	ticker               *time.Ticker
+	quit                 chan interface{}
+	hour, min, sec, nsec int
 }
 
 func deadline(start time.Time, hour, min, sec, nsec int) time.Duration {
@@ -29,23 +30,29 @@ func New(hour, min, sec, nsec int) *Recurring {
 		ticker: time.NewTicker(first),
 		quit:   make(chan interface{}),
 		c:      make(chan time.Time),
+		hour:   hour,
+		min:    min,
+		sec:    sec,
+		nsec:   nsec,
 	}
 	r.C = r.c
-	go func() {
-		for {
-			select {
-			case t := <-r.ticker.C:
-				r.ticker.Stop()
-				r.c <- t
-				now := time.Now().UTC()
-				r.ticker = time.NewTicker(deadline(now, hour, min, sec, nsec))
-			case <-r.quit:
-				r.ticker.Stop()
-				return
-			}
-		}
-	}()
+	go r.wait()
 	return r
+}
+
+func (r *Recurring) wait() {
+	for {
+		select {
+		case t := <-r.ticker.C:
+			r.ticker.Stop()
+			r.c <- t
+			now := time.Now().UTC()
+			r.ticker = time.NewTicker(deadline(now, r.hour, r.min, r.sec, r.nsec))
+		case <-r.quit:
+			r.ticker.Stop()
+			return
+		}
+	}
 }
 
 // Stop turns off a Recurring. After Stop, no more ticks will be sent.
