@@ -1,3 +1,5 @@
+// Package recurring provides a ticker that fires at a specific time of day. It is modeled
+// after time.Ticker in the standard library.
 package recurring
 
 import "time"
